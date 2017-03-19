@@ -8,8 +8,8 @@ var config = {
 	module: {
 		rules: [
 			{
-				test: /\.jsx?$/,
-				loader: 'babel-loader'
+				test: /\.(js|jsx)?$/,
+				use: 'babel-loader',
 			}
 		]
 	}
