@@ -5,6 +5,10 @@
   "main": "index.js",
   "author": "MROS",
   "license": "MIT",
+  "scripts": {
+	  "build": "webpack",
+    "run": "http-server ."
+  },
   "dependencies": {
     "babel-core": "^6.24.0",
     "babel-loader": "^6.4.1",
