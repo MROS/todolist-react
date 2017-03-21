@@ -1,58 +1,44 @@
-// 1. 皆以複製進行setState，若更改this.state則componentDidUpdate等等操作中的prevProps, preStates也會被修改
-// 2. 降低模組化程度 FunctionBar 沒有理由被切開
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { List, Map } from 'immutable';
 
 class TodoApp extends React.Component {
   constructor(props) {
     super(props);
     this.changeFilter = this.changeFilter.bind(this);
-    this.handleNewItemChange = this.handleNewItemChange.bind(this);
-    this.handleNewItemEnter = this.handleNewItemEnter.bind(this);
+    this.newItemChange = this.newItemChange.bind(this);
+    this.newItemEnter = this.newItemEnter.bind(this);
     this.killCompleted = this.killCompleted.bind(this);
     this.currentKey = 0;
     this.state = {
       newItemText: '',
       cond: 'all',
-      items: [
-        {
-          key: -2,
-          text: "兜風",
-          completed: false,
-          changing: false,
-        },
-        {
-          key: -1,
-          text: "看漫畫",
-          completed: true,
-          changing: false,
-        }
-      ]
+      items: List([]),
     };
   }
   killCompleted() {
     this.setState({
-      items: this.state.items.filter((item) => !item.completed),
+      items: this.state.items.filter((item) => !item.get('completed')),
     });
   }
-  handleNewItemEnter(e) {
-    if (e.key == 'Enter') {
-      var newItems  = [
-        {
+  createItem(text) {
+    this.currentKey += 1;
+    return Map({
           key: this.currentKey,
-          text: this.state.newItemText,
+          text: text,
           completed: false,
           changing: false
-        }
-      ].concat(this.state.items);
-      this.currentKey += 1;
+    });
+  }
+  newItemEnter(e) {
+    if (e.key == 'Enter') {
       this.setState({
         newItemText: '',
-        items: newItems,
+        items: this.state.items.unshift(this.createItem(this.state.newItemText)),
       })
     }
   }
-  handleNewItemChange(e) {
+  newItemChange(e) {
     this.setState({newItemText: e.target.value});
   }
   changeFilter(e) {
@@ -60,44 +46,40 @@ class TodoApp extends React.Component {
   }
   deleteItem(index) {
     return () => {
-      this.state.items.splice(index, 1);
       this.setState({
-        items: this.state.items
+        items: this.state.items.delete(index)
       })
     }
   }
   completeItem(index) {
     return () => {
-      this.state.items[index].completed = !this.state.items[index].completed;
+      var completed = !this.state.items.get(index).get('completed');
       this.setState({
-        items: this.state.items
+        items: this.state.items.update(index, (item) => item.set('completed', completed))
       })
     }
   }
   changeItem(index) {
     return (e) => {
-      var clone = JSON.parse(JSON.stringify(this.state.items));
-      clone[index].text = e.target.value;
+      var text = e.target.value;
       this.setState({
-        items: clone
+        items: this.state.items.update(index, (item) => item.set('text', text))
       })
     }
   }
   changeItemEnter(index) {
     return (e) => {
       if (e.key == 'Enter') {
-        this.state.items[index].changing = false;
         this.setState({
-          items: this.state.items,
+          items: this.state.items.update(index, (item) => item.set('changing', false))
         })
       }
     }
   }
   itemToInputMode(index) {
     return () => {
-      this.state.items[index].changing = true;
       this.setState({
-        items: this.state.items
+        items: this.state.items.update(index, (item) => item.set('changing', true))
       })
     }
   }
@@ -117,7 +99,7 @@ class TodoApp extends React.Component {
           <button onClick={this.killCompleted}>刪除已完成事項</button>
           <br />
           <input className="input" type="text" placeholder="輸入新事項"
-            value={this.state.newItemText} onChange={this.handleNewItemChange} onKeyPress={this.handleNewItemEnter}/>
+            value={this.state.newItemText} onChange={this.newItemChange} onKeyPress={this.newItemEnter}/>
         </div>
         <ul>
           {
@@ -127,49 +109,47 @@ class TodoApp extends React.Component {
                   case "all":
                     return true;
                   case "completed":
-                    return item.completed;
+                    return item.get('completed');
                   case "notYet":
-                    return !item.completed;
+                    return !item.get('completed');
                 }
               }
             ).map((item, i) => {
-              // TODO: key之研究
-              return <Item key={item.key} item={item}
-                completeItem={this.completeItem(i)}
+              return <Item key={item.get('key')} item={item}
+                onComplete={this.completeItem(i)}
                 inputMode={this.itemToInputMode(i)} 
                 onDelete={this.deleteItem(i)}
-                handleOnChange={this.changeItem(i)}
-                changeItemEnter={this.changeItemEnter(i)} />;
+                onChange={this.changeItem(i)}
+                onChangeItemEnter={this.changeItemEnter(i)} />;
             })
           }
         </ul>
       </div>
     );
   }
-}
+  }
 
 class Item extends React.Component {
   componentDidUpdate (prevProps) {
-    if ((prevProps.item.text != this.props.item.text) || prevProps.item.changing == false && this.props.item.changing) {
+    if ((prevProps.item.get('text') != this.props.item.get('text') || prevProps.item.get('changing') == false) && this.props.item.get('changing')) {
       this.textInput.focus();
-      console.log(this.textInput)
     }
   }
   render () {
     return (
       <li>
-        <input type="checkbox" name="completed" checked={this.props.item.completed}
-          onChange={this.props.completeItem}/>
+        <input type="checkbox" name="completed" checked={this.props.item.get('completed')}
+          onChange={this.props.onComplete}/>
         { 
           (() => {
-              if (this.props.item.changing) {
+              if (this.props.item.get('changing')) {
                 return <input type="input" 
-                  onChange={this.props.handleOnChange}
-                  onKeyPress={this.props.changeItemEnter}
-                  value={this.props.item.text}
+                  onChange={this.props.onChange}
+                  onKeyPress={this.props.onChangeItemEnter}
+                  value={this.props.item.get('text')}
                   ref={(input) => {this.textInput = input;}}/>
             } else {
-              return <span onDoubleClick={this.props.inputMode}>{this.props.item.text}</span>
+              return <span onDoubleClick={this.props.inputMode}>{this.props.item.get('text')}</span>
             }
           })()
         }
